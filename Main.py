@@ -81,6 +81,10 @@ product0=t_ind(quotes=merged[merged.asin==asins[0]])
 product1=t_ind(quotes=merged[merged.asin==asins[1]])
 product2=t_ind(quotes=merged[merged.asin==asins[2]])
 product3=t_ind(quotes=merged[merged.asin==asins[3]])
+product4=t_ind(quotes=merged[merged.asin==asins[4]])
+product5=t_ind(quotes=merged[merged.asin==asins[5]])
+product6=t_ind(quotes=merged[merged.asin==asins[6]])
+
 
 
 
