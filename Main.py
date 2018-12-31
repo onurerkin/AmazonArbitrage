@@ -205,7 +205,9 @@ pyplot.plot(ts_test_pred_ar)
 #
 
 
+# FEATURE ENGINEERING
 
+# aggregation of number of reviews and average star rating
 reviews_sorted=product_review.set_index('review_date').sort_index()
 reviews_sorted['number_of_reviews']=reviews_sorted.groupby('asin').cumcount()+1
 reviews_sorted['star_tot']=reviews_sorted.groupby('asin').star.cumsum()
@@ -365,6 +367,6 @@ model = randomforest.fit(X_train, y_train)
 y_test_pred=pd.DataFrame(model.predict(X_test))
 
 from sklearn.metrics import accuracy_score
-accuracy_score(y_test,y_test_pred)
+print(accuracy_score(y_test,y_test_pred))
 y_test_pred['actual']=y_test.reset_index(drop=True)
 
