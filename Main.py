@@ -229,16 +229,53 @@ df_pred.loc[(df_pred['T']>10),'decision']='buy'
 df_pred.loc[(df_pred['T']<-10),'decision']='sell'
 df_pred_head=df_pred.head(10000)
 
+#removing products less than 150 datapoints
+asd=df_pred.groupby(['asin']).count()
+asd=asd[asd.date > 150]
+asd.reset_index(level=0, inplace=True)
+df_pred=df_pred[df_pred.asin.isin(asd.asin)]
+df_pred=df_pred.reset_index(drop=True)
+df_pred=df_pred.dropna(subset=['sales_rank'])
+
+
+
+# BENCHMARK MODEL
+asins=df_pred.asin.unique().tolist()
+from sklearn.ensemble import RandomForestClassifier
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = df_pred[df_pred.asin==asins[i]]
+    
+
+benchmark_model={}
+for key, value in d.items():
+    X=value[['lowest_newprice','total_new','total_used','sales_rank']]
+    y=value.decision
+
+    from sklearn.model_selection import train_test_split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    randomforest = RandomForestClassifier(random_state=0)
+    model = randomforest.fit(X_train, y_train)
+    
+    
+    y_test_pred=pd.DataFrame(model.predict(X_test))
+    
+    from sklearn.metrics import accuracy_score
+    
+    benchmark_model[str(key)]=accuracy_score(y_test,y_test_pred)
+
+
+
+
+
+
+
+
+
+# IMPROVED MODEL
 
 asins=df_pred.asin.unique().tolist()
-product1=t_ind(quotes=merged[merged.asin==asins[1]])
-product2=t_ind(quotes=merged[merged.asin==asins[2]])
-product3=t_ind(quotes=merged[merged.asin==asins[3]])
-product4=t_ind(quotes=merged[merged.asin==asins[4]])
-product5=t_ind(quotes=merged[merged.asin==asins[5]])
-product6=t_ind(quotes=merged[merged.asin==asins[6]])
-
-
 
 #Accuracy for product 0
 product0=df_pred[df_pred.asin==asins[0]]
@@ -292,7 +329,7 @@ pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predic
 
 
 from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.5, random_state = 5)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
 
 model = randomforest.fit(X_train, y_train)
 
