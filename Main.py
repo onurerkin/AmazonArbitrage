@@ -118,60 +118,60 @@ merged_head=merged.head(1000)
 
 
 
-asins=merged.asin.unique().tolist()
-product0=t_ind(quotes=merged[merged.asin==asins[0]])
-product1=t_ind(quotes=merged[merged.asin==asins[1]])
-product2=t_ind(quotes=merged[merged.asin==asins[2]])
-product3=t_ind(quotes=merged[merged.asin==asins[3]])
-product4=t_ind(quotes=merged[merged.asin==asins[4]])
-product5=t_ind(quotes=merged[merged.asin==asins[5]])
-product6=t_ind(quotes=merged[merged.asin==asins[6]])
+#asins=merged.asin.unique().tolist()
+#product0=t_ind(quotes=merged[merged.asin==asins[0]])
+#product1=t_ind(quotes=merged[merged.asin==asins[1]])
+#product2=t_ind(quotes=merged[merged.asin==asins[2]])
+#product3=t_ind(quotes=merged[merged.asin==asins[3]])
+#product4=t_ind(quotes=merged[merged.asin==asins[4]])
+#product5=t_ind(quotes=merged[merged.asin==asins[5]])
+#product6=t_ind(quotes=merged[merged.asin==asins[6]])
+#
 
 
 
 
+## Create the time index
+#product6.set_index('date', inplace=True)
+#ts=product6.drop('decision',axis=1)
+#
+#
+## Verify the time index
+#product6.head()
+#product6.info()
+#product6.index
 
-# Create the time index
-product6.set_index('date', inplace=True)
-ts=product6.drop('decision',axis=1)
 
-
-# Verify the time index
-product6.head()
-product6.info()
-product6.index
-
-
-# Run the AutoRegressive model
-from statsmodels.tsa.ar_model import AR
-ar1=AR(ts)
-model1=ar1.fit()
-# View the results
-print('Lag: %s' % model1.k_ar)
-print('Coefficients: %s' % model1.params)
-
-# Separate the data into training and test
-split_size = round(len(ts)*0.3)
-ts_train,ts_test = ts[0:len(ts)-split_size], ts[len(ts)-split_size:]
-
-# Run the model again on the training data
-ar2=AR(ts_train)
-model2=ar2.fit()
-
-# Predicting the outcome based on the test data
-ts_test_pred_ar = model2.predict(start=len(ts_train),end=len(ts_train)+len(ts_test)-1,dynamic=False)
-ts_test_pred_ar.index=ts_test.index
-
-# Calculating the mean squared error of the model    
-from sklearn.metrics import mean_squared_error
-error = mean_squared_error(ts_test,ts_test_pred_ar)
-print('Test MSE: %.3f' %error)
-
-# Plot the graph comparing the real value and predicted value
-from matplotlib import pyplot
-fig = plt.figure(dpi=100)
-pyplot.plot(ts_test)
-pyplot.plot(ts_test_pred_ar)
+## Run the AutoRegressive model
+#from statsmodels.tsa.ar_model import AR
+#ar1=AR(ts)
+#model1=ar1.fit()
+## View the results
+#print('Lag: %s' % model1.k_ar)
+#print('Coefficients: %s' % model1.params)
+#
+## Separate the data into training and test
+#split_size = round(len(ts)*0.3)
+#ts_train,ts_test = ts[0:len(ts)-split_size], ts[len(ts)-split_size:]
+#
+## Run the model again on the training data
+#ar2=AR(ts_train)
+#model2=ar2.fit()
+#
+## Predicting the outcome based on the test data
+#ts_test_pred_ar = model2.predict(start=len(ts_train),end=len(ts_train)+len(ts_test)-1,dynamic=False)
+#ts_test_pred_ar.index=ts_test.index
+#
+## Calculating the mean squared error of the model    
+#from sklearn.metrics import mean_squared_error
+#error = mean_squared_error(ts_test,ts_test_pred_ar)
+#print('Test MSE: %.3f' %error)
+#
+## Plot the graph comparing the real value and predicted value
+#from matplotlib import pyplot
+#fig = plt.figure(dpi=100)
+#pyplot.plot(ts_test)
+#pyplot.plot(ts_test_pred_ar)
 
 
 #df_dateasin=merged[['date','asin']]
@@ -224,9 +224,8 @@ merged2['star_avg']=merged2.groupby('asin').star_avg.fillna(method='bfill')
 merged2_head=merged2.head(10000)
 df_pred = merged2[merged2['T'] < 40]
 df_pred_head=df_pred.head(10000)
-df_pred['decision']='hold'
-df_pred.loc[(df_pred['T']>10),'decision']='buy'
-df_pred.loc[(df_pred['T']<-10),'decision']='sell'
+df_pred['decision']=0 #don't buy
+df_pred.loc[(df_pred['T']>7),'decision']=1 #buy
 df_pred_head=df_pred.head(10000)
 
 #removing products less than 150 datapoints
@@ -239,36 +238,70 @@ df_pred=df_pred.dropna(subset=['sales_rank'])
 
 
 
+
 # BENCHMARK MODEL
 asins=df_pred.asin.unique().tolist()
 from sklearn.ensemble import RandomForestClassifier
+
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
 
 d = {}
 for i in range(len(asins)):
     d["product" + str(i)] = df_pred[df_pred.asin==asins[i]]
     
-
+    
 benchmark_model={}
+benchmark_ytest={}
 for key, value in d.items():
     X=value[['lowest_newprice','total_new','total_used','sales_rank']]
     y=value.decision
 
-    from sklearn.model_selection import train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
-    randomforest = RandomForestClassifier(random_state=0)
+
+    split_size = round(len(X)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    randomforest = RandomForestClassifier(random_state=0,n_estimators=100,max_depth=10)
     model = randomforest.fit(X_train, y_train)
     
     
     y_test_pred=pd.DataFrame(model.predict(X_test))
-    
+    test_pred=pd.concat([y_test,y_test_pred],axis=1)
+    benchmark_ytest[str(key)]=test_pred
+
+
     from sklearn.metrics import accuracy_score
     
     benchmark_model[str(key)]=accuracy_score(y_test,y_test_pred)
 
 
+    from sklearn.metrics import precision_recall_fscore_support as score
+    
+    precision, recall, fscore, support = score(y_test, y_test_pred)
+    
+    products.append(key)
+    accuracies.append(accuracy_score(y_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
 
-
-
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+benchmark_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+benchmark_scores=benchmark_scores.dropna()
+benchmark_scores=benchmark_scores[benchmark_scores['support_buy']!=0]
 
 
 
