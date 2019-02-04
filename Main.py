@@ -221,12 +221,31 @@ merged2['number_of_reviews']=merged2.groupby('asin').number_of_reviews.fillna(me
 merged2['number_of_reviews']=merged2.groupby('asin').number_of_reviews.fillna(method='bfill')
 merged2['star_avg']=merged2.groupby('asin').star_avg.fillna(method='ffill')
 merged2['star_avg']=merged2.groupby('asin').star_avg.fillna(method='bfill')
+
+
+
+
+# hold and buy
 merged2_head=merged2.head(10000)
 df_pred = merged2[merged2['T'] < 40]
 df_pred_head=df_pred.head(10000)
 df_pred['decision']=0 #don't buy
 df_pred.loc[(df_pred['T']>7),'decision']=1 #buy
 df_pred_head=df_pred.head(10000)
+
+#
+## price diff
+#price_diff=[]
+#df_pred['price_diff']=0
+#for game in df_pred.asin.unique():
+#    price_diff.append(0)
+#    for row in range(1,len(df_pred[df_pred.asin==game])):
+#        price_diff.append((df_pred.iloc[row,4]-df_pred.iloc[row-1,4])/df_pred.iloc[row-1,4]) 
+#df_pred['price_diff']=price_diff
+#df_pred_head=df_pred.head(10000)
+#
+#
+
 
 #removing products less than 150 datapoints
 asd=df_pred.groupby(['asin']).count()
@@ -242,6 +261,8 @@ df_pred=df_pred.dropna(subset=['sales_rank'])
 # BENCHMARK MODEL
 asins=df_pred.asin.unique().tolist()
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
+
 
 products=[]
 accuracies=[]
@@ -270,6 +291,12 @@ for key, value in d.items():
 #   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
     randomforest = RandomForestClassifier(random_state=0,n_estimators=100,max_depth=10)
     model = randomforest.fit(X_train, y_train)
+    
+#    sfm = SelectFromModel(model, threshold=0.03)
+#    sfm.fit(X_train, y_train)
+#    for feature_list_index in sfm.get_support(indices=True):
+#        print(X_train.columns[feature_list_index])
+
     
     
     y_test_pred=pd.DataFrame(model.predict(X_test))
@@ -303,140 +330,408 @@ benchmark_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,f
 benchmark_scores=benchmark_scores.dropna()
 benchmark_scores=benchmark_scores[benchmark_scores['support_buy']!=0]
 
+benchmark_scores.precision_buy.mean()  #precision is 44%
+benchmark_scores.recall_buy.mean()  #recall is  44%
+benchmark_scores.accuracy.mean()   #accuracy is 78%
+
+len(benchmark_scores[benchmark_scores.decision==0])/len(benchmark_scores)
+
+
+# all products (# just a random trial)
+#
+#X=df_pred[['total_new','total_used','sales_rank','price_diff']]
+#y=df_pred.decision
+#
+#from sklearn.model_selection import train_test_split
+#X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+#randomforest = RandomForestClassifier(random_state=0,n_estimators=100,max_depth=10)
+#model = randomforest.fit(X_train, y_train)
+#    
+#sfm = SelectFromModel(model, threshold=0.03)
+#sfm.fit(X_train, y_train)
+#for feature_list_index in sfm.get_support(indices=True):
+#    print(X_train.columns[feature_list_index])
+#y_test_pred=pd.DataFrame(model.predict(X_test))
+#
+#
+#from sklearn import metrics
+#from sklearn.metrics import classification_report
+#
+#print("MODEL B1: All Products \n")
+#
+#print ('The precision for this classifier is ' + str(metrics.precision_score(y_test, y_test_pred)))
+#print ('The recall for this classifier is ' + str(metrics.recall_score(y_test, y_test_pred)))
+#print ('The f1 for this classifier is ' + str(metrics.f1_score(y_test, y_test_pred)))
+#print ('The accuracy for this classifier is ' + str(metrics.accuracy_score(y_test, y_test_pred)))
+#
+#print ('\nHere is the classification report:')
+#print (classification_report(y_test, y_test_pred))
+#
+#from sklearn.metrics import confusion_matrix
+#print(pd.DataFrame(confusion_matrix(y_test, y_test_pred, labels=[1, 0]), index=['true:1', 'true:0'], columns=['pred:1', 'pred:0']))
+#
+
 
 
 
 # IMPROVED MODEL
+#asins=df_pred.asin.unique().tolist()
+#
+##Accuracy for product 0
+#product0=df_pred[df_pred.asin==asins[0]]
+#X=product0[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#y=product0.decision
+#
+#
+#from sklearn.ensemble import RandomForestClassifier
+#randomforest = RandomForestClassifier(random_state=0)
+#model = randomforest.fit(X, y)
+#
+#from sklearn.feature_selection import SelectFromModel
+#sfm = SelectFromModel(model, threshold=0.05)
+#sfm.fit(X, y)
+#for feature_list_index in sfm.get_support(indices=True):
+#    print(X.columns[feature_list_index])
+#    
+#pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
+#
+#
+#from sklearn.model_selection import train_test_split
+#X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+#
+#model = randomforest.fit(X_train, y_train)
+#
+#
+#y_test_pred=pd.DataFrame(model.predict(X_test))
+#
+#from sklearn.metrics import accuracy_score
+#accuracy_score(y_test,y_test_pred)
+#
+#
+##Accuracy for product 1
+#
+#product2=df_pred[df_pred.asin==asins[2]]
+#X=product2[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#y=product2.decision
+#
+#
+#from sklearn.ensemble import RandomForestClassifier
+#randomforest = RandomForestClassifier(random_state=0)
+#model = randomforest.fit(X, y)
+#
+#from sklearn.feature_selection import SelectFromModel
+#sfm = SelectFromModel(model, threshold=0.05)
+#sfm.fit(X, y)
+#for feature_list_index in sfm.get_support(indices=True):
+#    print(X.columns[feature_list_index])
+#    
+#pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
+#
+#
+#from sklearn.model_selection import train_test_split
+#X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+#
+#model = randomforest.fit(X_train, y_train)
+#
+#
+#y_test_pred=pd.DataFrame(model.predict(X_test))
+#
+#from sklearn.metrics import accuracy_score
+#accuracy_score(y_test,y_test_pred)
+#
+#
+##Accuracy for product 7
+#
+#product7=df_pred[df_pred.asin==asins[7]]
+#X=product7[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#y=product7.decision
+#
+#
+#from sklearn.ensemble import RandomForestClassifier
+#randomforest = RandomForestClassifier(random_state=0)
+#model = randomforest.fit(X, y)
+#
+#from sklearn.feature_selection import SelectFromModel
+#sfm = SelectFromModel(model, threshold=0.05)
+#sfm.fit(X, y)
+#for feature_list_index in sfm.get_support(indices=True):
+#    print(X.columns[feature_list_index])
+#    
+#pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
+#
+#
+#from sklearn.model_selection import train_test_split
+#X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+#
+#model = randomforest.fit(X_train, y_train)
+#
+#
+#y_test_pred=pd.DataFrame(model.predict(X_test))
+#
+#from sklearn.metrics import accuracy_score
+#accuracy_score(y_test,y_test_pred)
+#
+#
+#
+#
+#
+##Accuracy for product 9
+#
+#product9=df_pred[df_pred.asin==asins[9]]
+#X=product9[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#y=product9.decision
+#
+#
+#from sklearn.ensemble import RandomForestClassifier
+#randomforest = RandomForestClassifier(random_state=0)
+#model = randomforest.fit(X, y)
+#
+#from sklearn.feature_selection import SelectFromModel
+#sfm = SelectFromModel(model, threshold=0.05)
+#sfm.fit(X, y)
+#for feature_list_index in sfm.get_support(indices=True):
+#    print(X.columns[feature_list_index])
+#    
+#pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
+#
+#
+#from sklearn.model_selection import train_test_split
+#X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+#
+#model = randomforest.fit(X_train, y_train)
+#
+#
+#y_test_pred=pd.DataFrame(model.predict(X_test))
+#
+#from sklearn.metrics import accuracy_score
+#print(accuracy_score(y_test,y_test_pred))
+#y_test_pred['actual']=y_test.reset_index(drop=True)
+#
 
-asins=df_pred.asin.unique().tolist()
-
-#Accuracy for product 0
-product0=df_pred[df_pred.asin==asins[0]]
-X=product0[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-y=product0.decision
 
 
+
+
+# MATCHING QUESTION AND ANSWERS WITH PRODUCTS
+
+matching=product[['asin','forum_id']]
+
+product_question_asin = pd.merge(product_question,matching, on=['forum_id'])
+matching=product_question_asin[['asin','forum_id','question_id']]
+product_answer_asin=pd.merge(product_answer,matching, on=['question_id'])
+
+
+# FEATURE ENGINEERING FOR QUESTIONS AND ANSWERS
+
+# for questions
+questions_sorted=product_question_asin.set_index('question_date').sort_index()
+questions_sorted['sentiment_total']=questions_sorted.groupby('asin').sentiment.cumsum()
+questions_sorted['number_of_questions']=questions_sorted.groupby('asin').sentiment.cumcount()+1
+questions_sorted['sentiment_avg']=questions_sorted.sentiment_total/questions_sorted.number_of_questions
+
+questions_sorted['polarity_total']=questions_sorted.groupby('asin').polarity.cumsum()
+questions_sorted['polarity_avg']=questions_sorted.polarity_total/questions_sorted.number_of_questions
+
+questions_sorted['subjectivity_total']=questions_sorted.groupby('asin').subjectivity.cumsum()
+questions_sorted['subjectivity_avg']=questions_sorted.subjectivity_total/questions_sorted.number_of_questions
+
+questions_sorted['len_question']=questions_sorted.question.apply(len)
+questions_sorted['len_question_total']=questions_sorted.groupby('asin').len_question.cumsum()
+questions_sorted['question_lenght_avg']=questions_sorted['len_question_total']/questions_sorted.number_of_questions
+
+questions_sorted=questions_sorted.reset_index()
+questions_sorted = questions_sorted.drop_duplicates(['asin','question_date'], keep='last')
+
+
+questions_useful=questions_sorted[['question_date','asin', 'sentiment_total', 'number_of_questions', 'sentiment_avg',
+       'polarity_total', 'polarity_avg', 'subjectivity_total',
+       'subjectivity_avg', 'len_question_total',
+       'question_lenght_avg']]
+
+questions_useful.columns=['date','asin', 'sentiment_total_question', 'number_of_questions', 'sentiment_avg_question',
+       'polarity_total_question', 'polarity_avg_question', 'subjectivity_total_question',
+       'subjectivity_avg_question', 'len_question_total',
+       'question_lenght_avg']
+
+
+merged_ques = pd.merge(df_pred,questions_useful,how='left')
+merged_ques[['sentiment_total_question', 'number_of_questions', 'sentiment_avg_question',
+       'polarity_total_question', 'polarity_avg_question', 'subjectivity_total_question',
+       'subjectivity_avg_question', 'len_question_total',
+       'question_lenght_avg']]=merged_ques.groupby('asin')[['sentiment_total_question', 'number_of_questions', 'sentiment_avg_question',
+       'polarity_total_question', 'polarity_avg_question', 'subjectivity_total_question',
+       'subjectivity_avg_question', 'len_question_total',
+       'question_lenght_avg']].fillna(method='ffill')
+merged_ques[['sentiment_total_question', 'number_of_questions', 'sentiment_avg_question',
+       'polarity_total_question', 'polarity_avg_question', 'subjectivity_total_question',
+       'subjectivity_avg_question', 'len_question_total',
+       'question_lenght_avg']]=merged_ques.groupby('asin')[['sentiment_total_question', 'number_of_questions', 'sentiment_avg_question',
+       'polarity_total_question', 'polarity_avg_question', 'subjectivity_total_question',
+       'subjectivity_avg_question', 'len_question_total',
+       'question_lenght_avg']].fillna(method='bfill')
+merged_ques_head=merged_ques.head(10000)
+
+
+#for answers
+product_answer_sorted=product_answer_asin.set_index('answer_date').sort_index()
+product_answer_sorted['number_of_answers']=product_answer_sorted.groupby('asin').cumcount()+1
+product_answer_sorted['sentiment_total']=product_answer_sorted.groupby('asin').sentiment.cumsum()
+product_answer_sorted['sentiment_avg']=product_answer_sorted.sentiment_total/product_answer_sorted.number_of_answers
+
+
+product_answer_sorted['polarity_total']=product_answer_sorted.groupby('asin').polarity.cumsum()
+product_answer_sorted['polarity_avg']=product_answer_sorted.polarity_total/product_answer_sorted.number_of_answers
+
+product_answer_sorted['subjectivity_total']=product_answer_sorted.groupby('asin').subjectivity.cumsum()
+product_answer_sorted['subjectivity_avg']=product_answer_sorted.subjectivity_total/product_answer_sorted.number_of_answers
+
+product_answer_sorted['len_answer']=product_answer_sorted.answer.apply(len)
+product_answer_sorted['len_answer_total']=product_answer_sorted.groupby('asin').len_answer.cumsum()
+product_answer_sorted['answer_lenght_avg']=product_answer_sorted['len_answer_total']/product_answer_sorted.number_of_answers
+
+product_answer_sorted=product_answer_sorted.reset_index()
+
+
+product_answer_useful=product_answer_sorted[['answer_date','asin',
+        'number_of_answers', 'sentiment_total', 'sentiment_avg',
+       'polarity_total', 'polarity_avg', 'subjectivity_total',
+       'subjectivity_avg', 'len_answer_total',
+       'answer_lenght_avg']]
+
+product_answer_useful.columns=['date','asin',
+        'number_of_answers', 'sentiment_total_answer', 'sentiment_avg_answer',
+       'polarity_total_answer', 'polarity_avg_answer', 'subjectivity_total_answer',
+       'subjectivity_avg_answer', 'len_answer_total',
+       'answer_lenght_avg']
+
+
+
+merged_ans = pd.merge(merged_ques,product_answer_useful,how='left')
+merged_ans[ ['number_of_answers', 'sentiment_total_answer', 'sentiment_avg_answer',
+       'polarity_total_answer', 'polarity_avg_answer', 'subjectivity_total_answer',
+       'subjectivity_avg_answer', 'len_answer_total',
+       'answer_lenght_avg']]=merged_ans.groupby('asin')[['number_of_answers', 'sentiment_total_answer', 'sentiment_avg_answer',
+       'polarity_total_answer', 'polarity_avg_answer', 'subjectivity_total_answer',
+       'subjectivity_avg_answer', 'len_answer_total',
+       'answer_lenght_avg']].fillna(method='ffill')
+merged_ans[ ['number_of_answers', 'sentiment_total_answer', 'sentiment_avg_answer',
+       'polarity_total_answer', 'polarity_avg_answer', 'subjectivity_total_answer',
+       'subjectivity_avg_answer', 'len_answer_total',
+       'answer_lenght_avg']]=merged_ans.groupby('asin')[['number_of_answers', 'sentiment_total_answer', 'sentiment_avg_answer',
+       'polarity_total_answer', 'polarity_avg_answer', 'subjectivity_total_answer',
+       'subjectivity_avg_answer', 'len_answer_total',
+       'answer_lenght_avg']].fillna(method='bfill')
+merged_ans_head=merged_ans.head(20000)
+merged_ans.len_answer_total.isna().sum()
+merged_ans_dropedna=merged_ans.dropna()
+
+len(df_pred[df_pred.decision==0])/len(df_pred)
+
+
+
+
+
+# #### IMPROVED MODEL ####
+
+## keeping products with more than 150 data points
+asd=merged_ans_dropedna.groupby(['asin']).count()
+asd=asd[asd.date > 150]
+asd.reset_index(level=0, inplace=True)
+merged_ans_dropedna=merged_ans_dropedna[merged_ans_dropedna.asin.isin(asd.asin)]
+merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
+
+asins=merged_ans_dropedna.asin.unique().tolist()
 from sklearn.ensemble import RandomForestClassifier
-randomforest = RandomForestClassifier(random_state=0)
-model = randomforest.fit(X, y)
-
 from sklearn.feature_selection import SelectFromModel
-sfm = SelectFromModel(model, threshold=0.05)
-sfm.fit(X, y)
-for feature_list_index in sfm.get_support(indices=True):
-    print(X.columns[feature_list_index])
+
+#
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = merged_ans_dropedna[merged_ans_dropedna.asin==asins[i]]
     
-pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
+importance = pd.DataFrame()
 
-
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
-
-model = randomforest.fit(X_train, y_train)
-
-
-y_test_pred=pd.DataFrame(model.predict(X_test))
-
-from sklearn.metrics import accuracy_score
-accuracy_score(y_test,y_test_pred)
-
-
-#Accuracy for product 1
-
-product2=df_pred[df_pred.asin==asins[2]]
-X=product2[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-y=product2.decision
-
-
-from sklearn.ensemble import RandomForestClassifier
-randomforest = RandomForestClassifier(random_state=0)
-model = randomforest.fit(X, y)
-
-from sklearn.feature_selection import SelectFromModel
-sfm = SelectFromModel(model, threshold=0.05)
-sfm.fit(X, y)
-for feature_list_index in sfm.get_support(indices=True):
-    print(X.columns[feature_list_index])
     
-pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
-
-
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
-
-model = randomforest.fit(X_train, y_train)
-
-
-y_test_pred=pd.DataFrame(model.predict(X_test))
-
-from sklearn.metrics import accuracy_score
-accuracy_score(y_test,y_test_pred)
-
-
-#Accuracy for product 7
-
-product7=df_pred[df_pred.asin==asins[7]]
-X=product7[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-y=product7.decision
-
-
-from sklearn.ensemble import RandomForestClassifier
-randomforest = RandomForestClassifier(random_state=0)
-model = randomforest.fit(X, y)
-
-from sklearn.feature_selection import SelectFromModel
-sfm = SelectFromModel(model, threshold=0.05)
-sfm.fit(X, y)
-for feature_list_index in sfm.get_support(indices=True):
-    print(X.columns[feature_list_index])
+improved_model={}
+improved_ytest={}
+for key, value in d.items():
+    print(key)
     
-pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
-
-
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
-
-model = randomforest.fit(X_train, y_train)
-
-
-y_test_pred=pd.DataFrame(model.predict(X_test))
-
-from sklearn.metrics import accuracy_score
-accuracy_score(y_test,y_test_pred)
-
-
-
-
-
-#Accuracy for product 9
-
-product9=df_pred[df_pred.asin==asins[9]]
-X=product9[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-y=product9.decision
-
-
-from sklearn.ensemble import RandomForestClassifier
-randomforest = RandomForestClassifier(random_state=0)
-model = randomforest.fit(X, y)
-
-from sklearn.feature_selection import SelectFromModel
-sfm = SelectFromModel(model, threshold=0.05)
-sfm.fit(X, y)
-for feature_list_index in sfm.get_support(indices=True):
-    print(X.columns[feature_list_index])
+#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    y=value.decision
     
-pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient'])
+    ## feature selection
+    randomforest = RandomForestClassifier(random_state=0)
+    model = randomforest.fit(X, y)
+
+    sfm = SelectFromModel(model, threshold=0.01)
+    sfm.fit(X, y)
+    for feature_list_index in sfm.get_support(indices=True):
+        print(X.columns[feature_list_index])
+    
+    
+    feature_idx = sfm.get_support()
+    feature_name = X.columns[feature_idx]
+    print(pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient']).sort_values('Gini coefficient',ascending=False))
+    temp_importance=pd.DataFrame([list(model.feature_importances_)],columns=X.columns)
+    key_index=[key]
+    temp_importance.index = key_index
+    importance=importance.append(temp_importance)
+    X_important = pd.DataFrame(sfm.transform(X))
+    X_important.columns = feature_name
 
 
-from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+# model
+    split_size = round(len(X_important)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+#    X_train,X_test = X_important[0:len(X_important)-split_size], X_important[len(X_important)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    randomforest = RandomForestClassifier(random_state=0,n_estimators=100,max_depth=10)
+    model = randomforest.fit(X_train, y_train)
+    
+    # prediction
+    y_test_pred=pd.DataFrame(model.predict(X_test))
+    test_pred=pd.concat([y_test,y_test_pred],axis=1)
+    improved_ytest[str(key)]=test_pred
 
-model = randomforest.fit(X_train, y_train)
 
+    from sklearn.metrics import accuracy_score
+    improved_model[str(key)]=accuracy_score(y_test,y_test_pred)
+    from sklearn.metrics import precision_recall_fscore_support as score
+    precision, recall, fscore, support = score(y_test, y_test_pred)
+    products.append(key)
+    accuracies.append(accuracy_score(y_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
 
-y_test_pred=pd.DataFrame(model.predict(X_test))
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+improved_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+improved_scores=improved_scores.dropna()
+improved_scores=improved_scores[improved_scores['support_buy']!=0]
 
-from sklearn.metrics import accuracy_score
-print(accuracy_score(y_test,y_test_pred))
-y_test_pred['actual']=y_test.reset_index(drop=True)
+improved_scores.precision_buy.mean()  #precision is 36%
+improved_scores.recall_buy.mean()  #recall is  40%
+improved_scores.accuracy.mean()   #accuracy is 76%
 
+# importance dataframe removing zeros
+
+importance=importance[importance.lowest_newprice!=0]
+print(importance.mean().sort_values(ascending=False))
