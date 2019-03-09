@@ -6,6 +6,7 @@ Created on Thu Dec 20 22:28:42 2018
 @author: Erkin
 """
 
+#%%
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -263,7 +264,7 @@ df_pred=df_pred.reset_index(drop=True)
 df_pred=df_pred.dropna(subset=['sales_rank'])
 
 
-
+#%%
 
 # BENCHMARK MODEL
 
@@ -344,7 +345,7 @@ benchmark_scores.precision_buy.mean()  #precision is 52.7%
 benchmark_scores.recall_buy.mean()  #recall is  38%
 benchmark_scores.accuracy.mean()   #accuracy is 70%
 
-
+#%%
 
 
 
@@ -431,7 +432,7 @@ benchmark_scores.recall_buy.mean()  #recall is  56% - 46
 benchmark_scores.accuracy.mean()   #accuracy is 78% - 71
 
 
-
+#%%
 
 
 
@@ -606,6 +607,7 @@ benchmark_scores.accuracy.mean()   #accuracy is 78% - 71
 #y_test_pred['actual']=y_test.reset_index(drop=True)
 #
 
+#%%
 
 
 
@@ -725,13 +727,19 @@ merged_ans_dropedna=merged_ans.dropna()
 
 len(df_pred[df_pred.decision==0])/len(df_pred)
 
+#%%
 
 
 
 
 # #### IMPROVED MODEL ####
+#random forest classificiation
+
 
 ## keeping products with more than 150 data points
+
+
+
 asd=merged_ans_dropedna.groupby(['asin']).count()
 asd=asd[asd.date > 150]
 asd.reset_index(level=0, inplace=True)
@@ -741,6 +749,8 @@ merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
 asins=merged_ans_dropedna.asin.unique().tolist()
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_recall_fscore_support as score
 
 #
 products=[]
@@ -762,8 +772,8 @@ improved_ytest={}
 for key, value in d.items():
     print(key)
     
-#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
     y=value.decision
     
     ## feature selection
@@ -804,9 +814,7 @@ for key, value in d.items():
     improved_ytest[str(key)]=test_pred
 
 
-    from sklearn.metrics import accuracy_score
     improved_model[str(key)]=accuracy_score(y_test,y_test_pred)
-    from sklearn.metrics import precision_recall_fscore_support as score
     precision, recall, fscore, support = score(y_test, y_test_pred)
     products.append(key)
     accuracies.append(accuracy_score(y_test,y_test_pred))
@@ -825,15 +833,16 @@ improved_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fs
 improved_scores=improved_scores.dropna()
 improved_scores=improved_scores[improved_scores['support_buy']!=0]
 
-improved_scores.precision_buy.mean()  #precision is 36%
-improved_scores.recall_buy.mean()  #recall is  40%
-improved_scores.accuracy.mean()   #accuracy is 76%
+print('precision:',improved_scores.precision_buy.mean())  #precision is 40%
+print('recall:',improved_scores.recall_buy.mean())  #recall is  43%
+print('accuracy:',improved_scores.accuracy.mean())   #accuracy is 75.3%
 
 # importance dataframe removing zeros
 
 importance=importance[importance.lowest_newprice!=0]
 print(importance.mean().sort_values(ascending=False))
 
+#%%
 
 
 
@@ -849,7 +858,7 @@ merged_ans_dropedna=merged_ans_dropedna[merged_ans_dropedna.asin.isin(asd.asin)]
 merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
 
 asins=merged_ans_dropedna.asin.unique().tolist()
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import SelectFromModel
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_recall_fscore_support as score
@@ -874,8 +883,8 @@ improved_ytest={}
 for key, value in d.items():
     print(key)
     
-#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
     y=value['T']
     dec=value.decision
 
@@ -944,9 +953,9 @@ improved_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fs
 improved_scores=improved_scores.dropna()
 improved_scores=improved_scores[improved_scores['support_buy']>10]
 
-improved_scores.precision_buy.mean()  #precision is 36% - 56%
-improved_scores.recall_buy.mean()  #recall is  40% - 47%
-improved_scores.accuracy.mean()   #accuracy is 76% - 70%
+print('RandomForest Regression Improved Precison',improved_scores.precision_buy.mean())  #precision is 55%
+print('RandomForest Regression Improved Recall',improved_scores.recall_buy.mean())  #recall is  47.5%
+print('RandomForest Regression Improved Accuracy',improved_scores.accuracy.mean())   #accuracy is 70%
 
 #baseline accuracy is 63%
 improved_scores.support_hold.sum()/(improved_scores.support_buy.sum()+improved_scores.support_hold.sum())
@@ -958,6 +967,7 @@ print(importance.mean().sort_values(ascending=False))
 
 
 
+#%%
 
 
 ## KNN
@@ -999,8 +1009,8 @@ improved_ytest={}
 for key, value in d.items():
     print(key)
     
-#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
     y=value['T']
     dec=value.decision
     
@@ -1042,7 +1052,7 @@ for key, value in d.items():
 
 #   from sklearn.model_selection import train_test_split
 #   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
-    knn_reg=KNeighborsRegressor(n_neighbors=6)
+    knn_reg=KNeighborsRegressor(n_neighbors=2)
 #    params = {'n_neighbors':[5,6,7,8,9,10],
 #          'leaf_size':[1,2,3,5],
 #          'weights':['uniform', 'distance'],
@@ -1087,18 +1097,19 @@ improved_scores_knn=pd.concat([products_df,accuracies_df,precisions_df,recalls_d
 improved_scores_knn=improved_scores_knn.dropna()
 improved_scores_knn=improved_scores_knn[improved_scores_knn['support_buy']>10]
 
-improved_scores_knn.precision_buy.mean()  #precision is 38%
-improved_scores_knn.recall_buy.mean()  #recall is  28%
-improved_scores_knn.accuracy.mean()   #accuracy is 65%
+print('KNN Regression Improved Precision',improved_scores_knn.precision_buy.mean())  #precision is 50%
+print('KNN Regression Improved Recall',improved_scores_knn.recall_buy.mean())  #recall is  34%
+print('KNN Regression Improved Accuracy',improved_scores_knn.accuracy.mean())   #accuracy is 67%
 
 #baseline accuracy is 63%
 improved_scores.support_hold.sum()/(improved_scores.support_buy.sum()+improved_scores.support_hold.sum())
 
 # importance dataframe removing zeros
 
-importance=importance[importance.lowest_newprice!=0]
-print(importance.mean().sort_values(ascending=False))
+#importance=importance[importance.lowest_newprice!=0]
+#print(importance.mean().sort_values(ascending=False))
 
+#%%
 
 
 
@@ -1139,8 +1150,8 @@ improved_ytest={}
 for key, value in d.items():
     print(key)
     
-#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
     y=value.decision
     
     scaler = StandardScaler()
@@ -1175,7 +1186,7 @@ for key, value in d.items():
     y_test=y_test.reset_index(drop=True)
 #   from sklearn.model_selection import train_test_split
 #   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
-    knn_class=KNeighborsClassifier(n_neighbors=6)
+    knn_class=KNeighborsClassifier(n_neighbors=3)
     model = knn_class.fit(X_train, y_train)
     
     # prediction
@@ -1205,11 +1216,12 @@ improved_scores_knn_clas=pd.concat([products_df,accuracies_df,precisions_df,reca
 improved_scores_knn_clas=improved_scores_knn_clas.dropna()
 improved_scores_knn_clas=improved_scores_knn_clas[improved_scores_knn_clas['support_buy']>10]
 
-improved_scores_knn_clas.precision_buy.mean()  #precision is 31%
-improved_scores_knn_clas.recall_buy.mean()  #recall is  21%
-improved_scores_knn_clas.accuracy.mean()   #accuracy is 64%
+print('KNN Classification Improved Precision:',improved_scores_knn_clas.precision_buy.mean())  #precision is 42%
+print('KNN Classification Improved Recall:',improved_scores_knn_clas.recall_buy.mean())  #recall is  27%
+print('KNN Classification Improved Accuracy:',improved_scores_knn_clas.accuracy.mean())   #accuracy is 67%
 
 
+#%%
 
 
 # ANN Classification
@@ -1250,8 +1262,8 @@ improved_ytest={}
 for key, value in d.items():
     print(key)
     
-#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
     y=value.decision
     
     scaler = StandardScaler()
@@ -1332,11 +1344,12 @@ improved_scores_ann_clas=pd.concat([products_df,accuracies_df,precisions_df,reca
 improved_scores_ann_clas=improved_scores_ann_clas.dropna()
 improved_scores_ann_clas=improved_scores_ann_clas[improved_scores_ann_clas['support_buy']>10]
 
-improved_scores_ann_clas.precision_buy.mean()  #precision is 44%
-improved_scores_ann_clas.recall_buy.mean()  #recall is  54%
-improved_scores_ann_clas.accuracy.mean()   #accuracy is 59%
+print('ANN Classification Improved Precision:',improved_scores_ann_clas.precision_buy.mean())  #precision is 46%
+print('ANN Classification Improved Recall:',improved_scores_ann_clas.recall_buy.mean())  #recall is  52%
+print('ANN Classification Improved Accuracy:',improved_scores_ann_clas.accuracy.mean())   #accuracy is 62%
 
 
+#%%
 
 
 
@@ -1377,8 +1390,8 @@ improved_ytest={}
 for key, value in d.items():
     print(key)
     
-#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
-    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+#    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
     y=value['T']
     dec=value.decision
     
@@ -1460,16 +1473,21 @@ improved_scores_ann_reg=pd.concat([products_df,accuracies_df,precisions_df,recal
 improved_scores_ann_reg=improved_scores_ann_reg.dropna()
 improved_scores_ann_reg=improved_scores_ann_reg[improved_scores_ann_reg['support_buy']>10]
 
-improved_scores_ann_reg.precision_buy.mean()  #precision is 23%
-improved_scores_ann_reg.recall_buy.mean()  #recall is  %18
-improved_scores_ann_reg.accuracy.mean()   #accuracy is %64
+print('ANN Regression Improved Precision:',improved_scores_ann_reg.precision_buy.mean())  #precision is 25%
+print('ANN Regression Improved Recall:',improved_scores_ann_reg.recall_buy.mean())  #recall is  %15
+print('ANN Regression Improved Accuracy:',improved_scores_ann_reg.accuracy.mean())   #accuracy is %66
 
 #baseline accuracy is 63%
 improved_scores_ann_reg.support_hold.sum()/(improved_scores_ann_reg.support_buy.sum()+improved_scores_ann_reg.support_hold.sum())
 
 # importance dataframe removing zeros
 
-importance=importance[importance.lowest_newprice!=0]
-print(importance.mean().sort_values(ascending=False))
+#importance=importance[importance.lowest_newprice!=0]
+#print(importance.mean().sort_values(ascending=False))
 
+#%%
 
+### Boosting regression
+
+#import xgboost as xgb
+import pandas as pd
