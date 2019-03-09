@@ -11,6 +11,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import seaborn as sns
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
 
 # T VALUE FUNCTION
 
@@ -230,7 +237,7 @@ merged2_head=merged2.head(10000)
 df_pred = merged2[merged2['T'] < 40]
 df_pred_head=df_pred.head(10000)
 df_pred['decision']=0 #don't buy
-df_pred.loc[(df_pred['T']>7),'decision']=1 #buy
+df_pred.loc[(df_pred['T']>5),'decision']=1 #buy
 df_pred_head=df_pred.head(10000)
 
 #
@@ -259,6 +266,9 @@ df_pred=df_pred.dropna(subset=['sales_rank'])
 
 
 # BENCHMARK MODEL
+
+
+#random forest
 asins=df_pred.asin.unique().tolist()
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
@@ -328,13 +338,101 @@ fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
 supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
 benchmark_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
 benchmark_scores=benchmark_scores.dropna()
-benchmark_scores=benchmark_scores[benchmark_scores['support_buy']!=0]
+benchmark_scores=benchmark_scores[benchmark_scores['support_buy']>10]
 
-benchmark_scores.precision_buy.mean()  #precision is 44%
-benchmark_scores.recall_buy.mean()  #recall is  44%
-benchmark_scores.accuracy.mean()   #accuracy is 78%
+benchmark_scores.precision_buy.mean()  #precision is 52.7%
+benchmark_scores.recall_buy.mean()  #recall is  38%
+benchmark_scores.accuracy.mean()   #accuracy is 70%
 
-len(benchmark_scores[benchmark_scores.decision==0])/len(benchmark_scores)
+
+
+
+
+
+#regression
+asins=df_pred.asin.unique().tolist()
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.feature_selection import SelectFromModel
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_recall_fscore_support as score
+
+
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = df_pred[df_pred.asin==asins[i]]
+    
+    
+benchmark_model={}
+benchmark_ytest={}
+for key, value in d.items():
+    X=value[['lowest_newprice','total_new','total_used','sales_rank']]
+    y=value['T']
+    dec=value.decision
+
+
+    split_size = round(len(X)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+    dec_train,dec_test=dec[0:len(dec)-split_size], dec[len(dec)-split_size:]
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    randomforest = RandomForestRegressor(random_state=0,n_estimators=100,max_depth=10)
+    model = randomforest.fit(X_train, y_train)
+    
+#    sfm = SelectFromModel(model, threshold=0.03)
+#    sfm.fit(X_train, y_train)
+#    for feature_list_index in sfm.get_support(indices=True):
+#        print(X_train.columns[feature_list_index])
+
+    
+    
+    y_test_pred=pd.DataFrame(model.predict(X_test))
+    y_test_pred['decision']=0
+    y_test_pred.loc[y_test_pred[0]>5,'decision']=1
+    y_test_pred=y_test_pred.drop([0],axis=1)
+    test_pred=pd.concat([dec_test,y_test_pred],axis=1)
+    benchmark_ytest[str(key)]=test_pred
+
+
+    
+    benchmark_model[str(key)]=accuracy_score(dec_test,y_test_pred)
+
+    
+    precision, recall, fscore, support = score(dec_test, y_test_pred)
+    
+    products.append(key)
+    accuracies.append(accuracy_score(dec_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
+
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+benchmark_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+benchmark_scores=benchmark_scores.dropna()
+benchmark_scores=benchmark_scores[benchmark_scores['support_buy']>10]
+
+benchmark_scores.precision_buy.mean()  #precision is 51% - 57
+benchmark_scores.recall_buy.mean()  #recall is  56% - 46
+benchmark_scores.accuracy.mean()   #accuracy is 78% - 71
+
+
+
+
 
 
 # all products (# just a random trial)
@@ -735,3 +833,643 @@ improved_scores.accuracy.mean()   #accuracy is 76%
 
 importance=importance[importance.lowest_newprice!=0]
 print(importance.mean().sort_values(ascending=False))
+
+
+
+
+
+
+
+
+#regression
+asd=merged_ans_dropedna.groupby(['asin']).count()
+asd=asd[asd.date > 150]
+asd.reset_index(level=0, inplace=True)
+merged_ans_dropedna=merged_ans_dropedna[merged_ans_dropedna.asin.isin(asd.asin)]
+merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
+
+asins=merged_ans_dropedna.asin.unique().tolist()
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_recall_fscore_support as score
+
+#
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = merged_ans_dropedna[merged_ans_dropedna.asin==asins[i]]
+    
+importance = pd.DataFrame()
+
+    
+improved_model={}
+improved_ytest={}
+for key, value in d.items():
+    print(key)
+    
+#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    y=value['T']
+    dec=value.decision
+
+    ## feature selection
+    randomforest = RandomForestRegressor(random_state=0)
+    model = randomforest.fit(X, y)
+
+    sfm = SelectFromModel(model, threshold=0.01)
+    sfm.fit(X, y)
+    for feature_list_index in sfm.get_support(indices=True):
+        print(X.columns[feature_list_index])
+    
+    
+    feature_idx = sfm.get_support()
+    feature_name = X.columns[feature_idx]
+    print(pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient']).sort_values('Gini coefficient',ascending=False))
+    temp_importance=pd.DataFrame([list(model.feature_importances_)],columns=X.columns)
+    key_index=[key]
+    temp_importance.index = key_index
+    importance=importance.append(temp_importance)
+    X_important = pd.DataFrame(sfm.transform(X))
+    X_important.columns = feature_name
+
+
+# model
+    split_size = round(len(X_important)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+#    X_train,X_test = X_important[0:len(X_important)-split_size], X_important[len(X_important)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+    dec_train,dec_test=dec[0:len(dec)-split_size], dec[len(dec)-split_size:]
+
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    randomforest = RandomForestRegressor(random_state=0,n_estimators=100,max_depth=10)
+    model = randomforest.fit(X_train, y_train)
+    
+    # prediction
+    y_test_pred=pd.DataFrame(model.predict(X_test))
+    y_test_pred['decision']=0
+    y_test_pred.loc[y_test_pred[0]>5,'decision']=1
+    y_test_pred=y_test_pred.drop([0],axis=1)
+    test_pred=pd.concat([dec_test,y_test_pred],axis=1)
+    improved_ytest[str(key)]=test_pred
+    
+
+
+
+
+    improved_model[str(key)]=accuracy_score(dec_test,y_test_pred)
+    precision, recall, fscore, support = score(dec_test, y_test_pred)
+    products.append(key)
+    accuracies.append(accuracy_score(dec_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
+
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+improved_scores=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+improved_scores=improved_scores.dropna()
+improved_scores=improved_scores[improved_scores['support_buy']>10]
+
+improved_scores.precision_buy.mean()  #precision is 36% - 56%
+improved_scores.recall_buy.mean()  #recall is  40% - 47%
+improved_scores.accuracy.mean()   #accuracy is 76% - 70%
+
+#baseline accuracy is 63%
+improved_scores.support_hold.sum()/(improved_scores.support_buy.sum()+improved_scores.support_hold.sum())
+
+# importance dataframe removing zeros
+
+importance=importance[importance.lowest_newprice!=0]
+print(importance.mean().sort_values(ascending=False))
+
+
+
+
+
+## KNN
+
+
+#regression
+asd=merged_ans_dropedna.groupby(['asin']).count()
+asd=asd[asd.date > 150]
+asd.reset_index(level=0, inplace=True)
+merged_ans_dropedna=merged_ans_dropedna[merged_ans_dropedna.asin.isin(asd.asin)]
+merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
+
+asins=merged_ans_dropedna.asin.unique().tolist()
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_recall_fscore_support as score
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import StandardScaler
+
+
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = merged_ans_dropedna[merged_ans_dropedna.asin==asins[i]]
+    
+importance = pd.DataFrame()
+
+    
+improved_model={}
+improved_ytest={}
+for key, value in d.items():
+    print(key)
+    
+#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    y=value['T']
+    dec=value.decision
+    
+
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+
+#    ## feature selection
+#    randomforest = RandomForestRegressor(random_state=0)
+#    model = randomforest.fit(X, y)
+#
+#    sfm = SelectFromModel(model, threshold=0.01)
+#    sfm.fit(X, y)
+#    for feature_list_index in sfm.get_support(indices=True):
+#        print(X.columns[feature_list_index])
+#    
+#    
+#    feature_idx = sfm.get_support()
+#    feature_name = X.columns[feature_idx]
+#    print(pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient']).sort_values('Gini coefficient',ascending=False))
+#    temp_importance=pd.DataFrame([list(model.feature_importances_)],columns=X.columns)
+#    key_index=[key]
+#    temp_importance.index = key_index
+#    importance=importance.append(temp_importance)
+#    X_important = pd.DataFrame(sfm.transform(X))
+#    X_important.columns = feature_name
+
+
+# model
+    split_size = round(len(X)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+#    X_train,X_test = X_important[0:len(X_important)-split_size], X_important[len(X_important)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+    dec_train,dec_test=dec[0:len(dec)-split_size], dec[len(dec)-split_size:]
+
+
+
+
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    knn_reg=KNeighborsRegressor(n_neighbors=6)
+#    params = {'n_neighbors':[5,6,7,8,9,10],
+#          'leaf_size':[1,2,3,5],
+#          'weights':['uniform', 'distance'],
+#          'algorithm':['auto', 'ball_tree','kd_tree','brute'],
+#          'n_jobs':[-1]}
+#    model1 = GridSearchCV(model, param_grid=params, n_jobs=1)
+    model=knn_reg.fit(X_train,y_train)
+#    print("Best Hyper Parameters:\n",model1.best_params_)
+
+    
+#    randomforest = RandomForestRegressor(random_state=0,n_estimators=100,max_depth=10)
+#    model = randomforest.fit(X_train, y_train)
+    
+    # prediction
+    y_test_pred=pd.DataFrame(model.predict(X_test))
+    y_test_pred['decision']=0
+    y_test_pred.loc[y_test_pred[0]>5,'decision']=1
+    y_test_pred=y_test_pred.drop([0],axis=1)
+    test_pred=pd.concat([dec_test,y_test_pred],axis=1)
+    improved_ytest[str(key)]=test_pred
+    
+
+
+
+
+    improved_model[str(key)]=accuracy_score(dec_test,y_test_pred)
+    precision, recall, fscore, support = score(dec_test, y_test_pred)
+    products.append(key)
+    accuracies.append(accuracy_score(dec_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
+
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+improved_scores_knn=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+improved_scores_knn=improved_scores_knn.dropna()
+improved_scores_knn=improved_scores_knn[improved_scores_knn['support_buy']>10]
+
+improved_scores_knn.precision_buy.mean()  #precision is 38%
+improved_scores_knn.recall_buy.mean()  #recall is  28%
+improved_scores_knn.accuracy.mean()   #accuracy is 65%
+
+#baseline accuracy is 63%
+improved_scores.support_hold.sum()/(improved_scores.support_buy.sum()+improved_scores.support_hold.sum())
+
+# importance dataframe removing zeros
+
+importance=importance[importance.lowest_newprice!=0]
+print(importance.mean().sort_values(ascending=False))
+
+
+
+
+#### KNN classification
+
+
+asd=merged_ans_dropedna.groupby(['asin']).count()
+asd=asd[asd.date > 150]
+asd.reset_index(level=0, inplace=True)
+merged_ans_dropedna=merged_ans_dropedna[merged_ans_dropedna.asin.isin(asd.asin)]
+merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
+
+asins=merged_ans_dropedna.asin.unique().tolist()
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_recall_fscore_support as score
+#
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = merged_ans_dropedna[merged_ans_dropedna.asin==asins[i]]
+    
+importance = pd.DataFrame()
+
+    
+improved_model={}
+improved_ytest={}
+for key, value in d.items():
+    print(key)
+    
+#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    y=value.decision
+    
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+    
+#    ## feature selection
+#    randomforest = RandomForestClassifier(random_state=0)
+#    model = randomforest.fit(X, y)
+#
+#    sfm = SelectFromModel(model, threshold=0.01)
+#    sfm.fit(X, y)
+#    for feature_list_index in sfm.get_support(indices=True):
+#        print(X.columns[feature_list_index])
+#    
+#    
+#    feature_idx = sfm.get_support()
+#    feature_name = X.columns[feature_idx]
+#    print(pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient']).sort_values('Gini coefficient',ascending=False))
+#    temp_importance=pd.DataFrame([list(model.feature_importances_)],columns=X.columns)
+#    key_index=[key]
+#    temp_importance.index = key_index
+#    importance=importance.append(temp_importance)
+#    X_important = pd.DataFrame(sfm.transform(X))
+#    X_important.columns = feature_name
+
+
+# model
+    split_size = round(len(X)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+#    X_train,X_test = X_important[0:len(X_important)-split_size], X_important[len(X_important)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    knn_class=KNeighborsClassifier(n_neighbors=6)
+    model = knn_class.fit(X_train, y_train)
+    
+    # prediction
+    y_test_pred=pd.DataFrame(model.predict(X_test))
+    test_pred=pd.concat([y_test,y_test_pred],axis=1)
+    improved_ytest[str(key)]=test_pred
+
+
+    
+    improved_model[str(key)]=accuracy_score(y_test,y_test_pred)
+    
+    precision, recall, fscore, support = score(y_test, y_test_pred)
+    products.append(key)
+    accuracies.append(accuracy_score(y_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
+
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+improved_scores_knn_clas=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+improved_scores_knn_clas=improved_scores_knn_clas.dropna()
+improved_scores_knn_clas=improved_scores_knn_clas[improved_scores_knn_clas['support_buy']>10]
+
+improved_scores_knn_clas.precision_buy.mean()  #precision is 31%
+improved_scores_knn_clas.recall_buy.mean()  #recall is  21%
+improved_scores_knn_clas.accuracy.mean()   #accuracy is 64%
+
+
+
+
+# ANN Classification
+from sklearn.neural_network import MLPClassifier
+
+asd=merged_ans_dropedna.groupby(['asin']).count()
+asd=asd[asd.date > 150]
+asd.reset_index(level=0, inplace=True)
+merged_ans_dropedna=merged_ans_dropedna[merged_ans_dropedna.asin.isin(asd.asin)]
+merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
+
+asins=merged_ans_dropedna.asin.unique().tolist()
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.model_selection import GridSearchCV
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import precision_score, make_scorer
+custom_scorer = make_scorer(precision_score, greater_is_better=True,  pos_label=0)
+
+#
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = merged_ans_dropedna[merged_ans_dropedna.asin==asins[i]]
+    
+importance = pd.DataFrame()
+
+    
+improved_model={}
+improved_ytest={}
+for key, value in d.items():
+    print(key)
+    
+#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    y=value.decision
+    
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+    
+#    ## feature selection
+#    randomforest = RandomForestClassifier(random_state=0)
+#    model = randomforest.fit(X, y)
+#
+#    sfm = SelectFromModel(model, threshold=0.01)
+#    sfm.fit(X, y)
+#    for feature_list_index in sfm.get_support(indices=True):
+#        print(X.columns[feature_list_index])
+#    
+#    
+#    feature_idx = sfm.get_support()
+#    feature_name = X.columns[feature_idx]
+#    print(pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient']).sort_values('Gini coefficient',ascending=False))
+#    temp_importance=pd.DataFrame([list(model.feature_importances_)],columns=X.columns)
+#    key_index=[key]
+#    temp_importance.index = key_index
+#    importance=importance.append(temp_importance)
+#    X_important = pd.DataFrame(sfm.transform(X))
+#    X_important.columns = feature_name
+
+
+# model
+    split_size = round(len(X)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+#    X_train,X_test = X_important[0:len(X_important)-split_size], X_important[len(X_important)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+#    knn_class=KNeighborsClassifier(n_neighbors=6)
+#    model = knn_class.fit(X_train, y_train)
+    
+    mlp = MLPClassifier(max_iter=500, hidden_layer_sizes=(10), activation='tanh', learning_rate='adaptive', alpha=0.05)
+
+#    parameter_space = {
+#        'hidden_layer_sizes': [(5,5,5), (5,10,5), (5,5), (5,10), (5), (10)],
+#        'activation': ['tanh', 'relu'],
+#        'solver': ['sgd', 'adam'],
+#        'alpha': [0.0001, 0.05],
+#        'learning_rate': ['constant','adaptive'],
+#    }
+        
+    
+
+#    clf = GridSearchCV(estimator=mlp,scoring=custom_scorer,param_grid=parameter_space, n_jobs=-1)
+    mlp.fit(X_train, y_train)
+#    print("Best Hyper Parameters:\n",clf.best_params_)
+    
+    # prediction
+    y_test_pred=pd.DataFrame(mlp.predict(X_test))
+    test_pred=pd.concat([y_test,y_test_pred],axis=1)
+    improved_ytest[str(key)]=test_pred
+
+
+    from sklearn.metrics import accuracy_score
+    improved_model[str(key)]=accuracy_score(y_test,y_test_pred)
+    from sklearn.metrics import precision_recall_fscore_support as score
+    precision, recall, fscore, support = score(y_test, y_test_pred)
+    products.append(key)
+    accuracies.append(accuracy_score(y_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
+
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+improved_scores_ann_clas=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+improved_scores_ann_clas=improved_scores_ann_clas.dropna()
+improved_scores_ann_clas=improved_scores_ann_clas[improved_scores_ann_clas['support_buy']>10]
+
+improved_scores_ann_clas.precision_buy.mean()  #precision is 44%
+improved_scores_ann_clas.recall_buy.mean()  #recall is  54%
+improved_scores_ann_clas.accuracy.mean()   #accuracy is 59%
+
+
+
+
+
+
+#regression ANN
+asd=merged_ans_dropedna.groupby(['asin']).count()
+asd=asd[asd.date > 150]
+asd.reset_index(level=0, inplace=True)
+merged_ans_dropedna=merged_ans_dropedna[merged_ans_dropedna.asin.isin(asd.asin)]
+merged_ans_dropedna=merged_ans_dropedna.reset_index(drop=True)
+
+asins=merged_ans_dropedna.asin.unique().tolist()
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.feature_selection import SelectFromModel
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_recall_fscore_support as score
+from sklearn.model_selection import GridSearchCV
+from sklearn.neural_network import MLPRegressor
+
+
+
+products=[]
+accuracies=[]
+precisions=[]
+recalls=[]
+fscores=[]
+supports=[]
+
+d = {}
+for i in range(len(asins)):
+    d["product" + str(i)] = merged_ans_dropedna[merged_ans_dropedna.asin==asins[i]]
+    
+importance = pd.DataFrame()
+
+    
+improved_model={}
+improved_ytest={}
+for key, value in d.items():
+    print(key)
+    
+#    X=value[['lowest_newprice','total_new','total_used','sales_rank','number_of_reviews','star_avg']]
+    X=value.drop(['asin', 'name', 'date', 'list_price','lowest_usedprice','tradein_value','T','decision'],axis=1)
+    y=value['T']
+    dec=value.decision
+    
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+
+#    ## feature selection
+#    randomforest = RandomForestRegressor(random_state=0)
+#    model = randomforest.fit(X, y)
+#
+#    sfm = SelectFromModel(model, threshold=0.01)
+#    sfm.fit(X, y)
+#    for feature_list_index in sfm.get_support(indices=True):
+#        print(X.columns[feature_list_index])
+#    
+#    
+#    feature_idx = sfm.get_support()
+#    feature_name = X.columns[feature_idx]
+#    print(pd.DataFrame(list(zip(X.columns,model.feature_importances_)), columns = ['predictor','Gini coefficient']).sort_values('Gini coefficient',ascending=False))
+#    temp_importance=pd.DataFrame([list(model.feature_importances_)],columns=X.columns)
+#    key_index=[key]
+#    temp_importance.index = key_index
+#    importance=importance.append(temp_importance)
+#    X_important = pd.DataFrame(sfm.transform(X))
+#    X_important.columns = feature_name
+
+
+# model
+    split_size = round(len(X)*0.3)
+    X_train,X_test = X[0:len(X)-split_size], X[len(X)-split_size:]
+#    X_train,X_test = X_important[0:len(X_important)-split_size], X_important[len(X_important)-split_size:]
+    y_train, y_test = y[0:len(y)-split_size], y[len(y)-split_size:]
+    y_test=y_test.reset_index(drop=True)
+    dec_train,dec_test=dec[0:len(dec)-split_size], dec[len(dec)-split_size:]
+
+#   from sklearn.model_selection import train_test_split
+#   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 5)
+    mlp = MLPRegressor(max_iter=500, hidden_layer_sizes=(5,5,5), activation='tanh', learning_rate='adaptive', alpha=0.05)
+#    params = {'n_neighbors':[5,6,7,8,9,10],
+#          'leaf_size':[1,2,3,5],
+#          'weights':['uniform', 'distance'],
+#          'algorithm':['auto', 'ball_tree','kd_tree','brute'],
+#          'n_jobs':[-1]}
+#    model1 = GridSearchCV(model, param_grid=params, n_jobs=1)
+    model=mlp.fit(X_train,y_train)
+#    print("Best Hyper Parameters:\n",model1.best_params_)
+
+    
+#    randomforest = RandomForestRegressor(random_state=0,n_estimators=100,max_depth=10)
+#    model = randomforest.fit(X_train, y_train)
+    
+    # prediction
+    y_test_pred=pd.DataFrame(model.predict(X_test))
+    print(y_test_pred)
+    y_test_pred['decision']=0
+    y_test_pred.loc[y_test_pred[0]>5,'decision']=1
+    y_test_pred=y_test_pred.drop([0],axis=1)
+    test_pred=pd.concat([dec_test,y_test_pred],axis=1)
+    improved_ytest[str(key)]=test_pred
+    
+    
+    
+    improved_model[str(key)]=accuracy_score(dec_test,y_test_pred)
+    precision, recall, fscore, support = score(dec_test, y_test_pred)
+    products.append(key)
+    accuracies.append(accuracy_score(dec_test,y_test_pred))
+    precisions.append(precision)
+    recalls.append(recall)
+    fscores.append(fscore)
+    supports.append(support)
+
+products_df=pd.DataFrame({'products':products})
+accuracies_df=pd.DataFrame({'accuracy':accuracies})
+precisions_df=pd.DataFrame(precisions, columns=['precision_hold','precision_buy'])
+recalls_df=pd.DataFrame(recalls, columns=['recall_hold','recall_buy'])
+fscores_df=pd.DataFrame(fscores, columns=['fscore_hold','fscore_buy'])
+supports_df=pd.DataFrame(supports, columns=['support_hold','support_buy'])
+improved_scores_ann_reg=pd.concat([products_df,accuracies_df,precisions_df,recalls_df,fscores_df,supports_df],axis=1)
+improved_scores_ann_reg=improved_scores_ann_reg.dropna()
+improved_scores_ann_reg=improved_scores_ann_reg[improved_scores_ann_reg['support_buy']>10]
+
+improved_scores_ann_reg.precision_buy.mean()  #precision is 23%
+improved_scores_ann_reg.recall_buy.mean()  #recall is  %18
+improved_scores_ann_reg.accuracy.mean()   #accuracy is %64
+
+#baseline accuracy is 63%
+improved_scores_ann_reg.support_hold.sum()/(improved_scores_ann_reg.support_buy.sum()+improved_scores_ann_reg.support_hold.sum())
+
+# importance dataframe removing zeros
+
+importance=importance[importance.lowest_newprice!=0]
+print(importance.mean().sort_values(ascending=False))
+
+
